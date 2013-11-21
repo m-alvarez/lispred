@@ -261,7 +261,7 @@
 
 (defmethod substitute ((obj <formula>) &key var term)
   (match <formula> obj
-    ((<bin> op f1 f2)
+     ((<bin> op f1 f2)
      (<bin> op
 	    (substitute f1 :var var :term term)
 	    (substitute f2 :var var :term term)))
@@ -276,16 +276,23 @@
      (<eq> (substitute t1 :var var :term term)
 	   (substitute t2 :var var :term term)))))
 
-(defun substitution (i var term)
+(defun substitution (i term)
   (aif (get-proof-step i)
-       (if (substitutablep it :var var :term term)
-	   (substitute it :var var :term term)
-	   (format t "~a is not substitutable by ~a in ~a"
-		   (to-string var)
-		   (to-string term)
-		   (to-string it)))
+       (let ((formula (proof-step-formula it)))
+	 (match <formula> formula
+		((<all> v f)
+		 (if (substitutablep f :var v :term term)
+		     (add-proof-step
+		      :formula (substitute f :var v :term term)
+		      :rule-text (format nil "from ~@R by Substitution" i))
+		     (format t "~a is not substitutable by ~a in ~a"
+			     (to-string v)
+			     (to-string term)
+			     (to-string f))))
+		(_ (format t "~a is not a universal formula"
+			   (to-string formula)))))
        (format t "No such step ~@R" i)))
-
+		
 (defun axiom-forall (var f g)
   (if (not (find var (free-variables f) :test #'equalp))
       (add-proof-step :formula ($impl ($all var ($impl f g)) ($impl f ($all var g)))
@@ -297,8 +304,6 @@
 (defun axiom-eq-refl (term)
   (add-proof-step :formula ($eq term term)
 		  :rule-text "axiom 3.1"))
-
-  
 
 (defun construct-leibniz-fun ( fun-name binding-list )
   (let ((prop ($eq (<fun> fun-name (mapcar #'car binding-list))
